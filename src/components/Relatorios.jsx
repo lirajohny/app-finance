@@ -47,6 +47,20 @@ function Relatorios({ db, userId }) {
 
   // Defina carregarDados com useCallback ANTES do useEffect
 
+  const formatarValor = (valor) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valor);
+  };
+
+  const formatarData = (date) => {
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  };
   const alternarModoFiltro = (modo) => {
     setModoFiltro(modo);
     // Limpa a mensagem de erro ao mudar o modo
@@ -54,6 +68,16 @@ function Relatorios({ db, userId }) {
   };
 
   const carregarDados = useCallback(async () => {
+    // Se não houver usuário ou banco de dados, não faça nada
+    if (!db || !userId) {
+      return;
+    }
+    
+    // Não carregue dados se estivermos no modo semana específica mas não temos uma semana selecionada
+    if (modoFiltro === 'semanaEspecifica' && !semanaEspecifica) {
+      return;
+    }
+    
     try {
       setLoading(true);
       setErro('');
@@ -66,8 +90,8 @@ function Relatorios({ db, userId }) {
 
       if (modoFiltro === 'semanaEspecifica' && semanaEspecifica) {
         // Usar datas da semana específica
-        dataInicio = semanaEspecifica.inicio;
-        dataFim = semanaEspecifica.fim;
+        dataInicio = new Date(semanaEspecifica.inicio);
+        dataFim = new Date(semanaEspecifica.fim);
 
         // Criar intervalos diários para a semana específica
         intervalos = Array.from({ length: 7 }, (_, i) => {
@@ -276,7 +300,7 @@ function Relatorios({ db, userId }) {
     } finally {
       setLoading(false);
     }
-  }, [db, userId, periodo, modoFiltro, semanaEspecifica, formatarData]);
+  }, [db, userId, periodo, modoFiltro, semanaEspecifica]);
 
 
   const carregarSemanasDisponiveis = useCallback(async () => {
@@ -292,16 +316,28 @@ function Relatorios({ db, userId }) {
 
       // Encontrar a data mais antiga
       let dataInicial = new Date();
+      let encontrouDados = false;
 
       vendasPrimeiroSnapshot.forEach(doc => {
         const data = doc.data().data.toDate();
-        if (data < dataInicial) dataInicial = data;
+        if (data < dataInicial) {
+          dataInicial = data;
+          encontrouDados = true;
+        }
       });
 
       gastosPrimeiroSnapshot.forEach(doc => {
         const data = doc.data().data.toDate();
-        if (data < dataInicial) dataInicial = data;
+        if (data < dataInicial) {
+          dataInicial = data;
+          encontrouDados = true;
+        }
       });
+
+      // Se não encontrou dados, use a data atual
+      if (!encontrouDados) {
+        dataInicial = new Date();
+      }
 
       // Ajustar para o início da semana (domingo)
       const inicioSemana = new Date(dataInicial);
@@ -344,28 +380,19 @@ function Relatorios({ db, userId }) {
     } catch (error) {
       console.error("Erro ao carregar semanas disponíveis:", error);
     }
-  }, [db, userId, formatarData, semanaEspecifica]);
+  }, [db, userId, formatarData]);
 
-  // Agora use o useEffect com a função já definida
+  // Efeito para carregar as semanas disponíveis APENAS ao iniciar o componente
+  useEffect(() => {
+    if (db && userId) {
+      carregarSemanasDisponiveis();
+    }
+  }, [carregarSemanasDisponiveis, db, userId]);
+  
+  // Efeito separado para carregar dados quando os filtros mudarem
   useEffect(() => {
     carregarDados();
-    carregarSemanasDisponiveis();
-  }, [carregarDados], [carregarSemanasDisponiveis]);
-
-  const formatarValor = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
-  };
-
-  const formatarData = (date) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
-  };
+  }, [carregarDados]);
 
   const exportarPDF = async () => {
     try {
@@ -434,7 +461,6 @@ function Relatorios({ db, userId }) {
 
 
 
-        / Adicionar na parte de interface, após os botões de período
         <div className="mt-4">
           <label className="block text-gray-700 text-sm font-medium mb-2">Modo de Filtro</label>
           <div className="flex space-x-3 mb-4">
@@ -474,7 +500,9 @@ function Relatorios({ db, userId }) {
                 onChange={(e) => {
                   const semanaId = parseInt(e.target.value);
                   const semana = semanas.find(s => s.id === semanaId);
-                  setSemanaEspecifica(semana);
+                  if (semana && (!semanaEspecifica || semana.id !== semanaEspecifica.id)) {
+                    setSemanaEspecifica(semana);
+                  }
                 }}
               >
                 {semanas.map(semana => (
