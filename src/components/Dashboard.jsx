@@ -19,11 +19,13 @@ function Dashboard({ db, userId }) {
         // Calcula datas para filtro
         const hoje = new Date();
         const inicioSemana = new Date(hoje);
-        inicioSemana.setDate(hoje.getDate() - hoje.getDay()); // Domingo
+        // Ajusta para segunda-feira: se for domingo (0), subtrai 6 dias, senão subtrai (dia - 1)
+        const diasParaSegunda = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
+        inicioSemana.setDate(hoje.getDate() - diasParaSegunda);
         inicioSemana.setHours(0, 0, 0, 0);
 
         const fimSemana = new Date(inicioSemana);
-        fimSemana.setDate(inicioSemana.getDate() + 6); // Sábado
+        fimSemana.setDate(inicioSemana.getDate() + 6); // Domingo (6 dias após segunda)
         fimSemana.setHours(23, 59, 59, 999);
 
         // Consulta vendas da semana

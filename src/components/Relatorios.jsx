@@ -72,12 +72,12 @@ function Relatorios({ db, userId }) {
     if (!db || !userId) {
       return;
     }
-    
+
     // Não carregue dados se estivermos no modo semana específica mas não temos uma semana selecionada
     if (modoFiltro === 'semanaEspecifica' && !semanaEspecifica) {
       return;
     }
-    
+
     try {
       setLoading(true);
       setErro('');
@@ -93,7 +93,7 @@ function Relatorios({ db, userId }) {
         dataInicio = new Date(semanaEspecifica.inicio);
         dataFim = new Date(semanaEspecifica.fim);
 
-        // Criar intervalos diários para a semana específica
+        // Criar intervalos diários para a semana específica (segunda a domingo)
         intervalos = Array.from({ length: 7 }, (_, i) => {
           const inicio = new Date(dataInicio);
           inicio.setDate(dataInicio.getDate() + i);
@@ -135,10 +135,16 @@ function Relatorios({ db, userId }) {
             const semanasAtras = Math.ceil(diasAtras / 7);
 
             intervalos = Array.from({ length: semanasAtras }, (_, i) => {
+              // Calcula o início da semana (segunda-feira)
               const inicioSemana = new Date(hoje);
               inicioSemana.setDate(hoje.getDate() - (diasAtras - (i * 7)));
+              
+              // Ajusta para a segunda-feira dessa semana
+              const diasParaSegunda = inicioSemana.getDay() === 0 ? 6 : inicioSemana.getDay() - 1;
+              inicioSemana.setDate(inicioSemana.getDate() - diasParaSegunda);
               inicioSemana.setHours(0, 0, 0, 0);
 
+              // Fim da semana é domingo (início + 6 dias)
               const fimSemana = new Date(inicioSemana);
               fimSemana.setDate(inicioSemana.getDate() + 6);
               fimSemana.setHours(23, 59, 59, 999);
@@ -339,9 +345,12 @@ function Relatorios({ db, userId }) {
         dataInicial = new Date();
       }
 
-      // Ajustar para o início da semana (domingo)
+      // Ajustar para o início da semana (segunda-feira)
       const inicioSemana = new Date(dataInicial);
-      inicioSemana.setDate(dataInicial.getDate() - dataInicial.getDay());
+      // getDay() retorna 0 para domingo, 1 para segunda, etc.
+      // Para começar na segunda-feira: se for domingo (0), subtrai 6 dias, senão subtrai (dia - 1)
+      const diasParaSubtrair = dataInicial.getDay() === 0 ? 6 : dataInicial.getDay() - 1;
+      inicioSemana.setDate(dataInicial.getDate() - diasParaSubtrair);
       inicioSemana.setHours(0, 0, 0, 0);
 
       // Calcular todas as semanas até hoje
@@ -354,6 +363,7 @@ function Relatorios({ db, userId }) {
         const inicioSemanaAtual = new Date(dataAtual);
 
         const fimSemanaAtual = new Date(dataAtual);
+        // O fim da semana deve ser domingo (início + 6 dias)
         fimSemanaAtual.setDate(fimSemanaAtual.getDate() + 6);
         fimSemanaAtual.setHours(23, 59, 59, 999);
 
@@ -388,7 +398,7 @@ function Relatorios({ db, userId }) {
       carregarSemanasDisponiveis();
     }
   }, [carregarSemanasDisponiveis, db, userId]);
-  
+
   // Efeito separado para carregar dados quando os filtros mudarem
   useEffect(() => {
     carregarDados();
